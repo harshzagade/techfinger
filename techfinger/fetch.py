@@ -13,7 +13,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 
-DEFAULT_USER_AGENT = "TechFinger/1.0 (+https://github.com/harshzagade/techfinger)"
+DEFAULT_USER_AGENT = "TechFinger/1.1 (+https://github.com/harshzagade/techfinger)"
 DEFAULT_TIMEOUT = 10
 MAX_BODY_BYTES = 2 * 1024 * 1024  # 2 MiB is plenty for fingerprinting
 

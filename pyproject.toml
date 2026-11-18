@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "techfinger"
-version = "1.0.0"
+version = "1.1.0"
 description = "Wappalyzer-lite: fingerprint web technologies from headers + HTML/JS patterns with an offline rule set."
 readme = "README.md"
 license = {text = "MIT"}
