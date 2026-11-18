@@ -89,3 +89,25 @@ def test_load_rules_file_rejects_bad_rule(tmp_path):
             {"kind": "nope", "pattern": "x", "weight": 10}]}]}))
     with pytest.raises(ValueError, match="bad rule"):
         load_rules_file(str(path))
+
+
+def test_rule_set_has_150_technologies():
+    assert len(RULES) >= 150
+
+def test_no_duplicate_technology_names():
+    names = [t.name for t in RULES]
+    assert len(set(names)) == len(names), f"Duplicate technologies found: {[n for n in names if names.count(n) > 1]}"
+
+def test_every_technology_has_a_strong_rule():
+    import re
+    for tech in RULES:
+        assert any(r.weight >= 40 for r in tech.rules), f"{tech.name} has no strong rules (weight >= 40)"
+        for rule in tech.rules:
+            assert 1 <= rule.weight <= 100
+            re.compile(rule.pattern, re.IGNORECASE)
+            if rule.kind == "path":
+                assert rule.path is not None
+                assert rule.path.startswith("/")
+                assert " 200 " in rule.pattern
+            else:
+                assert rule.path is None
