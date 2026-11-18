@@ -25,6 +25,7 @@ class FetchResult:
     status: int | None
     headers: dict[str, str] = field(default_factory=dict)
     body: str = ""
+    raw: bytes = b""
     error: str | None = None
 
 
@@ -60,6 +61,7 @@ def fetch_url(url: str, timeout: int = DEFAULT_TIMEOUT,
                 status=response.status,
                 headers=headers,
                 body=_decode_body(raw, headers.get("content-type", "")),
+                raw=raw,
             )
     except urllib.error.HTTPError as exc:
         # An error page still carries fingerprintable headers/body.
@@ -71,6 +73,7 @@ def fetch_url(url: str, timeout: int = DEFAULT_TIMEOUT,
             status=exc.code,
             headers=headers,
             body=_decode_body(raw, headers.get("content-type", "")),
+            raw=raw,
         )
     except (urllib.error.URLError, TimeoutError, ssl.SSLError,
             OSError) as exc:

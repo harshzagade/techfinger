@@ -9,6 +9,10 @@ Each technology is a list of rules. A rule matches one surface of a page:
 - ``meta``: matched against ``name=content`` strings built from the page's
   ``<meta>`` tags (e.g. ``generator=WordPress 6.4.2``).
 - ``cookie``: matched against the ``Set-Cookie`` header values.
+- ``favicon``: matches the SHA-256-based favicon hash string.
+- ``js`` / ``css``: match fetched same-origin script/stylesheet file contents.
+- ``path``: matches strings of the form "{path} {status} {body snippet}"
+  from known-path probes (requires the ``path`` field).
 
 ``weight`` is the score a matched rule contributes (0-100 scale, capped).
 Strong identifiers (a generator meta tag, ``X-Powered-By: Express``) score
@@ -25,7 +29,7 @@ import json
 import re
 from dataclasses import dataclass, field
 
-VALID_KINDS = ("header", "html", "script", "meta", "cookie")
+VALID_KINDS = ("header", "html", "script", "meta", "cookie", "favicon", "js", "css", "path")
 
 
 @dataclass
@@ -35,10 +39,15 @@ class Rule:
     weight: int
     description: str
     version_group: int | None = None
+    path: str | None = None
 
     def __post_init__(self) -> None:
         if self.kind not in VALID_KINDS:
             raise ValueError(f"unknown rule kind: {self.kind!r}")
+        if self.kind == "path" and self.path is None:
+            raise ValueError("kind 'path' requires a path")
+        if self.kind != "path" and self.path is not None:
+            raise ValueError(f"kind {self.kind!r} cannot have a path")
         if not 0 < self.weight <= 100:
             raise ValueError(f"rule weight must be 1-100, got {self.weight}")
         re.compile(self.pattern)  # fail fast on a bad regex
@@ -52,8 +61,8 @@ class Technology:
 
 
 def _r(kind: str, pattern: str, weight: int, description: str,
-       version_group: int | None = None) -> Rule:
-    return Rule(kind, pattern, weight, description, version_group)
+       version_group: int | None = None, path: str | None = None) -> Rule:
+    return Rule(kind, pattern, weight, description, version_group, path)
 
 
 # ---------------------------------------------------------------------------
@@ -68,6 +77,8 @@ RULES: list[Technology] = [
         _r("html", r"/wp-includes/", 40, "wp-includes path in page"),
         _r("script", r"wp-includes/", 40, "script from wp-includes"),
         _r("html", r"wp-json", 25, "wp-json API reference"),
+        _r("path", r" 200 .*wp/v2", 40, "wp-json API responds", None, path="/wp-json/"),
+        _r("path", r" 200 .*WordPress", 40, "wp-login.php page", None, path="/wp-login.php"),
     ]),
     Technology("Drupal", "CMS", [
         _r("meta", r"^generator=Drupal(?:\s+([\d.]+))?", 60,
@@ -82,6 +93,7 @@ RULES: list[Technology] = [
            "generator meta tag", 1),
         _r("html", r"/media/jui/", 40, "Joomla media/jui path"),
         _r("html", r"Joomla!", 25, "Joomla! string in page"),
+        _r("path", r" 200 .*Joomla", 40, "administrator login page", None, path="/administrator/"),
     ]),
     Technology("Ghost", "CMS", [
         _r("meta", r"^generator=Ghost(?:\s+([\d.]+))?", 60,
@@ -179,10 +191,13 @@ RULES: list[Technology] = [
     Technology("jQuery", "JavaScript library", [
         _r("script", r"jquery(\.min)?\.js", 40, "jquery script"),
         _r("html", r"jQuery\(", 25, "jQuery( call in page"),
+        _r("js", r"jQuery(?: JavaScript Library)? v([\d.]+)", 60, "jQuery version banner in JS file", 1),
     ]),
     Technology("Bootstrap", "CSS framework", [
         _r("html", r"bootstrap(\.min)?\.(css|js)", 40, "bootstrap asset"),
         _r("html", r"bootstrap", 20, "bootstrap string in page"),
+        _r("css", r"Bootstrap v([\d.]+)", 60, "Bootstrap version banner in CSS file", 1),
+        _r("js", r"Bootstrap v([\d.]+)", 60, "Bootstrap version banner in JS file", 1),
     ]),
     Technology("Tailwind CSS", "CSS framework", [
         _r("script", r"cdn\.tailwindcss\.com", 60, "Tailwind Play CDN script"),
@@ -262,7 +277,7 @@ def load_rules_file(path: str) -> list[Technology]:
 
         {"technologies": [{"name": "WordPress", "category": "CMS",
           "rules": [{"kind": "html", "pattern": "...", "weight": 40,
-                     "description": "...", "version_group": 1}]}]}
+                     "description": "...", "version_group": 1, "path": "/..."}]}]}
 
     Technologies with a name already in the built-in set replace it;
     new names are added. Raises ValueError on malformed input.
@@ -285,7 +300,8 @@ def load_rules_file(path: str) -> list[Technology]:
         try:
             rules = [Rule(r["kind"], r["pattern"], r["weight"],
                           r.get("description", r["pattern"]),
-                          r.get("version_group"))
+                          r.get("version_group"),
+                          r.get("path"))
                      for r in entry["rules"]]
         except KeyError as exc:
             raise ValueError(f"rule in {entry['name']!r} missing {exc}") from exc

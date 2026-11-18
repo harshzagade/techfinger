@@ -71,9 +71,14 @@ def _surfaces(headers: dict[str, str], body: str) -> dict[str, list[str]]:
 
 
 def fingerprint(headers: dict[str, str], body: str,
-                technologies: list[Technology] | None = None) -> list[Detection]:
+                technologies: list[Technology] | None = None, *,
+                extra_surfaces: dict[str, list[str]] | None = None) -> list[Detection]:
     """Return detections sorted by confidence (highest first)."""
     surfaces = _surfaces(headers, body)
+    if extra_surfaces:
+        for kind, items in extra_surfaces.items():
+            surfaces.setdefault(kind, []).extend(items)
+
     detections: list[Detection] = []
     for tech in (technologies if technologies is not None else RULES):
         score = 0
@@ -81,7 +86,7 @@ def fingerprint(headers: dict[str, str], body: str,
         evidence: list[str] = []
         for rule in tech.rules:
             matched = None
-            for candidate in surfaces[rule.kind]:
+            for candidate in surfaces.get(rule.kind, []):
                 match = re.search(rule.pattern, candidate, re.IGNORECASE)
                 if match:
                     matched = (match, candidate)

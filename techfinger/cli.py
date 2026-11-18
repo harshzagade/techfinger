@@ -6,10 +6,10 @@ import argparse
 import sys
 
 from . import __version__
-from .fetch import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT, fetch_url
-from .fingerprint import fingerprint
+from .fetch import DEFAULT_TIMEOUT, DEFAULT_USER_AGENT
 from .report import render_json, render_text
 from .rules import list_technologies, merged_rules
+from .scan import scan_url
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -28,6 +28,12 @@ def build_parser() -> argparse.ArgumentParser:
                         help="User-Agent header to send")
     parser.add_argument("--rules",
                         help="JSON file with extra/override technology rules")
+    parser.add_argument("--no-favicon", action="store_false", dest="favicon",
+                        default=True, help="disable favicon fingerprinting")
+    parser.add_argument("--no-assets", action="store_false", dest="assets",
+                        default=True, help="disable same-origin JS/CSS scanning")
+    parser.add_argument("--no-paths", action="store_false", dest="paths",
+                        default=True, help="disable known-path probing")
     parser.add_argument("--list", action="store_true",
                         help="list the technologies the rule set knows "
                              "and exit")
@@ -57,18 +63,18 @@ def main(argv: list[str] | None = None) -> int:
         print(f"techfinger: {exc}", file=sys.stderr)
         return 2
 
-    result = fetch_url(args.url, timeout=args.timeout,
-                       user_agent=args.user_agent)
-    if result.error is not None:
-        print(f"techfinger: {result.error}", file=sys.stderr)
+    scan = scan_url(args.url, technologies=technologies,
+                    timeout=args.timeout, user_agent=args.user_agent,
+                    enable_favicon=args.favicon, enable_assets=args.assets,
+                    enable_paths=args.paths)
+    if scan.error is not None:
+        print(f"techfinger: {scan.error}", file=sys.stderr)
         return 1
 
-    detections = fingerprint(result.headers, result.body,
-                             technologies=technologies)
     if args.json:
-        print(render_json(result, detections), end="")
+        print(render_json(scan, scan.detections), end="")
     else:
-        print(render_text(result, detections), end="")
+        print(render_text(scan, scan.detections), end="")
     return 0
 
 
