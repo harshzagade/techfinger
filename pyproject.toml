@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "techfinger"
+version = "1.0.0"
+description = "Wappalyzer-lite: fingerprint web technologies from headers + HTML/JS patterns with an offline rule set."
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Harsh Zagade", email = "harshnzagade@gmail.com"}]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+techfinger = "techfinger.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["techfinger*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
